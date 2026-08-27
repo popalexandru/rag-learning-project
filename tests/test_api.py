@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.chunking import chunk_text
 from app.config import Settings, get_settings
 from app.main import app, get_openai_service, get_vector_store
 from app.vector_math import cosine_similarity
@@ -20,6 +21,13 @@ def test_root_links_to_docs() -> None:
 
     assert response.status_code == 200
     assert response.json()["docs"] == "/docs"
+
+
+def test_chunk_text_uses_overlapping_windows() -> None:
+    chunks = chunk_text("abcdefghij", chunk_size=6, chunk_overlap=2)
+
+    assert [chunk.text for chunk in chunks] == ["abcdef", "efghij"]
+    assert [(chunk.char_start, chunk.char_end) for chunk in chunks] == [(0, 6), (4, 10)]
 
 
 def test_chat_explains_when_key_is_missing() -> None:
@@ -163,3 +171,43 @@ def test_rag_does_not_call_generation_when_store_is_empty() -> None:
     assert response.status_code == 200
     assert response.json()["sources"] == []
     assert response.json()["generation_tokens"] == 0
+
+
+class FakeUploadService:
+    async def embed(self, texts: list[str]) -> tuple[list[list[float]], int]:
+        return [[1.0, 0.0] for _ in texts], len(texts)
+
+
+def test_text_file_is_chunked_indexed_and_searchable() -> None:
+    store = InMemoryVectorStore()
+    app.dependency_overrides[get_openai_service] = lambda: FakeUploadService()
+    app.dependency_overrides[get_vector_store] = lambda: store
+    try:
+        upload_response = client.post(
+            "/documents/upload",
+            files={"file": ("guide.md", b"A" * 150, "text/markdown")},
+            data={"chunk_size": "100", "chunk_overlap": "20"},
+        )
+        search_response = client.post(
+            "/search",
+            json={"query": "guide", "top_k": 2},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert upload_response.status_code == 200
+    assert upload_response.json()["chunks_created"] == 2
+    assert upload_response.json()["filename"] == "guide.md"
+    results = search_response.json()["results"]
+    assert len(results) == 2
+    assert results[0]["metadata"]["filename"] == "guide.md"
+    assert results[0]["metadata"]["chunk_index"] == 0
+
+
+def test_upload_rejects_unsupported_file_type() -> None:
+    response = client.post(
+        "/documents/upload",
+        files={"file": ("guide.pdf", b"not-a-pdf", "application/pdf")},
+    )
+
+    assert response.status_code == 415

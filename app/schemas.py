@@ -52,6 +52,18 @@ class AddDocumentsResponse(BaseModel):
     tokens: int
 
 
+class UploadDocumentResponse(BaseModel):
+    document_id: str
+    filename: str
+    ids: list[str]
+    chunks_created: int
+    chunk_size: int
+    chunk_overlap: int
+    dimensions: int
+    model: str
+    tokens: int
+
+
 class SearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=30_000)
     top_k: int = Field(default=3, ge=1, le=20)

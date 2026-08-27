@@ -107,6 +107,20 @@ similarity locally in `app/vector_math.py`; OpenAI does not calculate that score
 
 ## In-memory vector search
 
+Upload and automatically chunk a UTF-8 `.txt` or `.md` file from Swagger or curl:
+
+```bash
+curl -X POST http://127.0.0.1:8000/documents/upload \
+  -F 'file=@guide.md' \
+  -F 'chunk_size=1000' \
+  -F 'chunk_overlap=200'
+```
+
+The current educational algorithm uses fixed-size character windows. With a chunk
+size of 1,000 and overlap of 200, the windows start at characters 0, 800, 1,600, and
+so on. Each chunk stores its filename, document ID, index, and character offsets as
+metadata. Uploads are limited to 2 MiB and must contain UTF-8 text.
+
 Index several short documents in one embeddings request:
 
 ```bash
