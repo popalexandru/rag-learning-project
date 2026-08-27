@@ -20,7 +20,7 @@ The project includes:
 Requirements: Git, Docker Desktop, and an OpenAI API key.
 
 ```bash
-git clone YOUR_GITHUB_REPOSITORY_URL
+git clone https://github.com/popalexandru/rag-learning-project.git
 cd rag-learning-project
 cp .env.example .env
 ```
